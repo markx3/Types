@@ -80,24 +80,4 @@ exif = Lam "x" (If (Var "x") (Lit (LitI 1)) (Lit (LitI 0)))
 ex1case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "y"]), (Lit (LitB True))), (PCon "Nothing" [], Lit (LitB False))])
 ex2case = Lam "x" (Case (Var "x") [(PVar "x", Lit (LitI 1))])
 
--- \x.case x of
---     x -> 1
--- ((t1->"Int")->t1->"Int",[("t0",t1->"Int")])
---ex2case = (Case ((Lam "x" (App))))
 infer e = runTI (tiExpr [] e)
-
-
-
-
-
-
-
--- tiExpr g (Case e l) = do (pats, exprs) = unzip l
---                          (t, s) <- tiExpr g e
-
--- tiPat g (PLit u)    = tiExpr g (Lit u)
--- tiPat g (PVar u)    = tiExpr g (Var u)
--- tiPat g (PCon u []) = tiContext g u
--- tiPat g (PCon u l ) = do (t, gu) <- tiContext g u
-                    --   lts <- mapM (tiPat g) l
-                    --   let (ts, gs) <- unzip lts
