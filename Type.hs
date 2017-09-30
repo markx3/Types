@@ -26,13 +26,15 @@ typeInt, typeBool :: SimpleType
 typeInt  = TCon "Int"
 typeBool = TCon "Bool"
 
-freshInst a = TCon a
+freshInst a = TVar a
 
 instance Show SimpleType where
    show (TVar i) = i
    show (TArr (TVar i) t) = i++"->"++show t
    show (TArr t t') = "("++show t++")"++"->"++show t'
+   show (TApp t t') = show t ++ " " ++ show t'
    show (TCon u) = show u
+
 --------------------------
 instance Functor TI where
    fmap f (TI m) = TI (\e -> let (a, e') = m e in (f a, e'))
@@ -72,10 +74,12 @@ instance Subs SimpleType where
                        Nothing -> TVar u
   apply _ (TCon u  ) =  TCon u
   apply s (TArr l r) =  (TArr (apply s l) (apply s r))
+  apply s (TApp l r) =  (TApp (apply s l) (apply s r))
 
 
   tv (TVar u)  = [u]
   tv (TCon u)  = []
+  tv (TApp l r) = tv l `union` tv r
   --tv (PCon _ [])  = []
   --tv (PCon u _)  = []
   tv (TArr l r) = tv l `union` tv r

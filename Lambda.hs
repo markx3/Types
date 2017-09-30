@@ -18,15 +18,15 @@ tiPat g (PLit i) = do (t, s) <- tiLit i
                       return (t, g)
 tiPat g (PCon i pats) = do (ts, gs') <- tiPats g pats
                            t' <- freshVar
-                           let t = freshInst i
+                           let t = tiContext g i
                            traceM $ show ts
                            traceM $ show gs'
                            let s = unify t (foldr (-->) t' ts)
                            return (apply s t', gs'/+/g)
 
 tiPats g pats = do pss <- mapM (tiPat g) pats
-                   let ts = concat [ [ts'] | (ts',_) <- pss ] {--Criar lista de tipos a partir da dupla--}
-                       gs = concat [ gs' | (_,gs') <- pss ]   {--Criar lista de environments a partir da dupla--}
+                   let ts = concat [ [ts'] | (ts',_) <- pss ]   {--Cria lista de tipos a partir do par--}
+                       gs = concat [  gs'  | (_,gs') <- pss ]   {--Cria lista de environments a partir do par--}
                    traceM $ show ts
                    traceM $ show gs
                    return (ts, gs)
@@ -34,6 +34,9 @@ tiPats g pats = do pss <- mapM (tiPat g) pats
 tiAlt g (pat, e) = do (t, g') <- tiPats g [pat]
                       (t', s) <- tiExpr (g' /+/ g) e
                       return (foldr (-->) t' t, s, (g' /+/ g))
+
+-- tiAlts g alts = do pss <- mapM (tiAlt g) alts
+--                    mapM (unify )
 
 -- tiAlts g alts = do (ts, gs) <- mapM (tiAlt g) alts
 --                    let s = unify
@@ -60,10 +63,10 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
                             return (apply s5 t'', s5 @@ s4 @@ s3 @@ s2 @@ s1)
 -- tiExpr g (Case e pats) = do (
 
-tiExpr g (Case e pats) = do [(t', s', g')] <- mapM (tiAlt g) pats
+tiExpr g (Case e alts) = do [(t', s', g')] <- mapM (tiAlt g) alts
                             (te, se)     <- tiExpr (g/+/g') e
-                            let s'' = unify t' te
-                            return (apply s'' te, s'' @@ s')
+                            let s'' = unify (apply s' te) t'
+                            return (apply s'' te, s'' @@ s' @@ se)
 
 ex1 = Lam "f" (Lam "x" (App (Var "f") (Var "x")))
 ex2 = Lam "x" (App (Var "x") (Var "x"))
@@ -77,7 +80,11 @@ ex7 = (App (Lam "x" (Var "x")) (If (Lit (LitB True)) (Lit (LitI 10)) (Lit (LitI 
 ex8 = (App (If (Lit (LitB True)) (Lit (LitI 10)) (Lit (LitI 20))) (Lam "x" (Var "x")))
 exif = Lam "x" (If (Var "x") (Lit (LitI 1)) (Lit (LitI 0)))
 -- excase = Lam "x" (Case (Var "x") [((PCon "Just" [Var "x"]), (Var "x")))
-ex1case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "y"]), (Lit (LitB True))), (PCon "Nothing" [], Lit (LitB False))])
+ex1case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True))), (PCon "Nothing" [], Lit (LitB False))])
 ex2case = Lam "x" (Case (Var "x") [(PVar "x", Lit (LitI 1))])
 
-infer e = runTI (tiExpr [] e)
+
+contexto = ["Just" :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
+            "Nothing" :>: TApp (TCon "Maybe") (TVar "a")]
+
+infer e = runTI (tiExpr contexto e)
