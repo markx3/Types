@@ -1,5 +1,5 @@
 module Type where
-import Data.List(nub, intersect, union)
+import Data.List(nub, intersect, union, nubBy)
 
 type Index = Int
 type Id = String
@@ -7,18 +7,32 @@ data TI a = TI (Index -> (a, Index))
 type Subst  = [(Id, SimpleType)]
 data Assump = Id :>: SimpleType deriving (Eq, Show)
 
-data SimpleType  = TVar Id
-                  | TArr  SimpleType SimpleType
+data SimpleType   = TVar Id
+                  | TArr SimpleType SimpleType
                   | TCon String
+                  | TApp SimpleType SimpleType
                   deriving Eq
+
+data Lit   = LitI Integer
+           | LitB Bool
+           deriving (Eq, Show, Ord)
+
+data Pat = PVar Id
+         | PLit Lit
+         | PCon Id [Pat]
+         deriving (Show, Eq)
+
 typeInt, typeBool :: SimpleType
 typeInt  = TCon "Int"
 typeBool = TCon "Bool"
+
+freshInst a = TCon a
 
 instance Show SimpleType where
    show (TVar i) = i
    show (TArr (TVar i) t) = i++"->"++show t
    show (TArr t t') = "("++show t++")"++"->"++show t'
+   show (TCon u) = show u
 --------------------------
 instance Functor TI where
    fmap f (TI m) = TI (\e -> let (a, e') = m e in (f a, e'))
@@ -42,6 +56,10 @@ infixr 4 @@
 (@@)       :: Subst -> Subst -> Subst
 s1 @@ s2    = [ (u, apply s1 t) | (u,t) <- s2 ] ++ s1
 
+symEq (x:>:y) (u:>:v) = (x == u)
+
+(/+/)      :: [Assump] -> [Assump] -> [Assump]
+a1 /+/ a2    = nubBy symEq $ union a1 a2
 ----------------------------
 class Subs t where
   apply :: Subst -> t -> t
@@ -52,10 +70,14 @@ instance Subs SimpleType where
                     case lookup u s of
                        Just t  -> t
                        Nothing -> TVar u
+  apply _ (TCon u  ) =  TCon u
   apply s (TArr l r) =  (TArr (apply s l) (apply s r))
 
 
   tv (TVar u)  = [u]
+  tv (TCon u)  = []
+  --tv (PCon _ [])  = []
+  --tv (PCon u _)  = []
   tv (TArr l r) = tv l `union` tv r
 
 
@@ -78,6 +100,8 @@ mgu (TArr l r,  TArr l' r') = do s1 <- mgu (l,l')
                                  return (s2 @@ s1)
 mgu (t,        TVar u   )   =  varBind u t
 mgu (TVar u,   t        )   =  varBind u t
+mgu (TCon u,   TCon t   )   |  u == t = (Just [])
+mgu (_,        _        )   =  Nothing
 
 unify t t' =  case mgu (t,t') of
     Nothing -> error ("unification: trying to unify\n" ++ (show t) ++ "\nand\n" ++
