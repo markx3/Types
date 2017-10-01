@@ -19,21 +19,27 @@ tiPat g (PLit i) = do (t, s) <- tiLit i
 tiPat g (PCon i pats) = do (ts, gs') <- tiPats g pats
                            t' <- freshVar
                            let t = tiContext g i
-                           traceM $ show ts
-                           traceM $ show gs'
                            let s = unify t (foldr (-->) t' ts)
                            return (apply s t', gs'/+/g)
 
 tiPats g pats = do pss <- mapM (tiPat g) pats
                    let ts = concat [ [ts'] | (ts',_) <- pss ]   {--Cria lista de tipos a partir do par--}
                        gs = concat [  gs'  | (_,gs') <- pss ]   {--Cria lista de environments a partir do par--}
-                   traceM $ show ts
-                   traceM $ show gs
                    return (ts, gs)
 
-tiAlt g (pat, e) = do (t, g') <- tiPats g [pat]
+tiAlt g (pat, e) = do (t', s) <- tiExpr g e
+                      (t, g') <- tiPats g [pat]
                       (t', s) <- tiExpr (g' /+/ g) e
                       return (foldr (-->) t' t, s, (g' /+/ g))
+
+tiAlts g e alts    = do
+                       (te, se) <- tiExpr g e
+                       tsg <- mapM (tiAlt g) alts
+                       let ts = concat [ [ts'] | (ts',_,_) <- tsg]
+                           ss = concat [  ss'  | (_,ss',_) <- tsg]
+                           gs = concat [  gs'  | (_,_,gs') <- tsg]
+                       let s = map (unify te) ts
+                       return (apply s te, ss @@ s @@ se)
 
 -- tiAlts g alts = do pss <- mapM (tiAlt g) alts
 --                    mapM (unify )
@@ -50,6 +56,7 @@ tiExpr g (App e e') = do (t, s1) <- tiExpr g e
                          let s3 = unify (apply s2 t) (t' --> b)
                          return (apply s3 b, s3 @@ s2 @@ s1)
 tiExpr g (Lam i e) = do b <- freshVar
+                        traceM $ show "oi " ++  show b
                         (t, s)  <- tiExpr (g/+/[i:>:b]) e -- Arrumar p/ verificar se existe variavel com esse nome (/+/ p/ excluir)
                         return (apply s (b --> t), s)    {-- primeiro verifica se existe, tira dps adiciona nova variave --}
 tiExpr g (Lit i) = do (t, s) <- tiLit i
@@ -63,10 +70,25 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
                             return (apply s5 t'', s5 @@ s4 @@ s3 @@ s2 @@ s1)
 -- tiExpr g (Case e pats) = do (
 
-tiExpr g (Case e alts) = do [(t', s', g')] <- mapM (tiAlt g) alts
-                            (te, se)     <- tiExpr (g/+/g') e
-                            let s'' = unify (apply s' te) t'
-                            return (apply s'' te, s'' @@ s' @@ se)
+-- tiExpr g (Case e alts) = do [(t', s', g')] <- mapM (tiAlt g) alts
+--                             (te, se)     <- tiExpr (g/+/g') e
+--                             traceM $ "alts: " ++ show t'
+--                             traceM $ "alts subs: " ++ show s'
+--                             traceM $ "alts env: " ++ show g'
+--                             traceM $ "expr type: " ++ show te
+--                             traceM $ "expr subs: " ++ show se
+--                             let s'' = unify (apply s' te) t'
+--                             traceM $ "s'' = " ++ show s''
+--                             traceM $ "apply: " ++ show (apply s'' te)
+--                             return (apply s'' te, s'' @@ s' @@ se)
+
+-- tiExpr g (Case e alts) = do (ts, ss, gs) <- tiAlts g alts
+--                             (te, se)     <- tiExpr (g /+/ gs) e
+--                             t' <- freshVar
+--                             let s''       = unify
+--                             return (apply s'' te, s'' @@ se)
+
+tiExpr g (Case e alts) = tiAlts g e alts
 
 ex1 = Lam "f" (Lam "x" (App (Var "f") (Var "x")))
 ex2 = Lam "x" (App (Var "x") (Var "x"))
@@ -81,8 +103,15 @@ ex8 = (App (If (Lit (LitB True)) (Lit (LitI 10)) (Lit (LitI 20))) (Lam "x" (Var 
 exif = Lam "x" (If (Var "x") (Lit (LitI 1)) (Lit (LitI 0)))
 -- excase = Lam "x" (Case (Var "x") [((PCon "Just" [Var "x"]), (Var "x")))
 ex1case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True))), (PCon "Nothing" [], Lit (LitB False))])
-ex2case = Lam "x" (Case (Var "x") [(PVar "x", Lit (LitI 1))])
+ex2case = Lam "x" (Case (Var "x") [(PLit (LitB True), (Var "x"))])
+ex3case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True)))])
 
+mycase x = case x of
+    Just x -> True
+
+othercase x = case x of
+    Just x -> True
+    Nothing -> False
 
 contexto = ["Just" :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
             "Nothing" :>: TApp (TCon "Maybe") (TVar "a")]

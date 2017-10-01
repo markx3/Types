@@ -9,7 +9,7 @@ data Assump = Id :>: SimpleType deriving (Eq, Show)
 
 data SimpleType   = TVar Id
                   | TArr SimpleType SimpleType
-                  | TCon String
+                  | TCon Id
                   | TApp SimpleType SimpleType
                   deriving Eq
 
@@ -105,6 +105,8 @@ mgu (TArr l r,  TArr l' r') = do s1 <- mgu (l,l')
 mgu (t,        TVar u   )   =  varBind u t
 mgu (TVar u,   t        )   =  varBind u t
 mgu (TCon u,   TCon t   )   |  u == t = (Just [])
+mgu (TCon u,   t        )   =  varBind u t
+mgu (t     ,   TCon u   )   =  varBind u t
 mgu (_,        _        )   =  Nothing
 
 unify t t' =  case mgu (t,t') of
