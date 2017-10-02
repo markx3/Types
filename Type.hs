@@ -17,6 +17,8 @@ data Lit   = LitI Integer
            | LitB Bool
            deriving (Eq, Show, Ord)
 
+data BinOp = Add | Sub | Mul | Div | Eql deriving (Eq, Ord, Show)
+
 data Pat = PVar Id
          | PLit Lit
          | PCon Id [Pat]
@@ -31,7 +33,7 @@ freshInst a = TVar a
 instance Show SimpleType where
    show (TVar i) = i
    show (TArr (TVar i) t) = i++"->"++show t
-   show (TArr t t') = "("++show t++")"++"->"++show t'
+   show (TArr t t') = "("++show t++")"++"->"++show t' --- Colocar parenteses em TArr a@TArr (parentes só quando tem função)
    show (TApp t t') = show t ++ " " ++ show t'
    show (TCon u) = show u
 
@@ -58,10 +60,10 @@ infixr 4 @@
 (@@)       :: Subst -> Subst -> Subst
 s1 @@ s2    = [ (u, apply s1 t) | (u,t) <- s2 ] ++ s1
 
-symEq (x:>:y) (u:>:v) = (x == u)
+tEq (x:>:y) (u:>:v) = (x == u)
 
 (/+/)      :: [Assump] -> [Assump] -> [Assump]
-a1 /+/ a2    = nubBy symEq $ union a1 a2
+a1 /+/ a2    = nubBy tEq $ union a1 a2
 ----------------------------
 class Subs t where
   apply :: Subst -> t -> t
@@ -72,16 +74,17 @@ instance Subs SimpleType where
                     case lookup u s of
                        Just t  -> t
                        Nothing -> TVar u
-  apply _ (TCon u  ) =  TCon u
+  apply s (TCon u)  =
+                    case lookup u s of
+                       Just t  -> t
+                       Nothing -> TCon u
   apply s (TArr l r) =  (TArr (apply s l) (apply s r))
   apply s (TApp l r) =  (TApp (apply s l) (apply s r))
 
 
   tv (TVar u)  = [u]
-  tv (TCon u)  = []
+  tv (TCon u)  = [u]
   tv (TApp l r) = tv l `union` tv r
-  --tv (PCon _ [])  = []
-  --tv (PCon u _)  = []
   tv (TArr l r) = tv l `union` tv r
 
 
@@ -102,9 +105,13 @@ varBind u t | t == TVar u   = Just []
 mgu (TArr l r,  TArr l' r') = do s1 <- mgu (l,l')
                                  s2 <- mgu ((apply s1 r) ,  (apply s1 r'))
                                  return (s2 @@ s1)
+mgu ((TApp l r),(TApp l' r')) = do s1 <- mgu (l, l')
+                                   s2 <- mgu ((apply s1 r),   (apply s1 r'))
+                                   return (s2 @@ s1)
 mgu (t,        TVar u   )   =  varBind u t
 mgu (TVar u,   t        )   =  varBind u t
 mgu (TCon u,   TCon t   )   |  u == t = (Just [])
+                            |  otherwise = Nothing
 mgu (TCon u,   t        )   =  varBind u t
 mgu (t     ,   TCon u   )   =  varBind u t
 mgu (_,        _        )   =  Nothing
