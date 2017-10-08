@@ -15,7 +15,6 @@ tiLit (LitI _) = return (typeInt, [])
 tiLit (LitB _) = return (typeBool, [])
 
 tiPat g (PVar i) = do let b = tiContext g i
-                      traceM $ "b = " ++ show b
                       return (b, g/+/[i:>:b])
 tiPat g (PLit i) = do (t, s) <- tiLit i
                       return (t, g)
@@ -38,7 +37,7 @@ tiAlts g alts    = do pss <- mapM (tiAlt g) alts
                       let ts = concat [ [ts'] | (ts',_,_) <- pss]
                           ss = concat [  ss'  | (_,ss',_) <- pss]
                           gs = concat [  gs'  | (_,_,gs') <- pss]
-                      return (ts, ss, g/+/gs)
+                      return (ts, ss, g++gs)
 
 tiContext g i = let (_ :>: t) = head (dropWhile (\(i' :>: _) -> i /= i' ) g) in t
 
@@ -50,8 +49,8 @@ tiExpr g (App e e') = do (t, s1) <- tiExpr g e
                          return (apply s3 b, s3 @@ s2 @@ s1)
 tiExpr g (Lam i e) = do b <- freshVar
                         (t, s)  <- tiExpr (g /+/ [i:>:b]) e
-                        traceM $ show s ++ "\n"
-                        traceM $ show (g ++[i:>:b]) ++ "\n"
+                        --traceM $ show s ++ "\n"
+                        --traceM $ show (g ++[i:>:b]) ++ "\n"
                         return (apply s (b --> t), s)
 tiExpr g (Lit i) = do (t, s) <- tiLit i
                       return (t, s)
@@ -63,18 +62,14 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
                             -- traceM $ show (s5)
                             return (apply s5 t'', s5 @@ s4 @@ s3 @@ s2 @@ s1)
 
-tiExpr g (Case e alts) = do (te, se)     <- tiExpr g e
-                            (t', s', g') <- tiAlts (apply se g) alts
-                            traceM $ show s'
+tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
+                            (t', s', g') <- tiAlts (apply s g) alts
+                            traceM $ "t' =" ++ show t'
+                            traceM $ "s' =" ++ show s'
                             fv <- freshVar
-                            let s'' = unify' fv t'
-                            --let s''' = unify te fv
-                            let s4  = se @@ s' @@ s'' -- @@ s'''
-
-                            traceM $ "s'' = " ++ show s''
-                            --traceM $ "s'' = " ++ show s''
-                            --traceM $ "apply: " ++ show (apply s'' te)
-                            return (apply s4 fv, s4)
+                            let s'' = unify' (te --> fv) t'
+                            let s'''  = s @@ s' @@ s'' -- @@ s'''
+                            return (apply s''' fv, s''')
 
 unify' t [x] = unify t x
 unify' t (x:xs) = let s = unify t x in unify' (apply s t) xs
