@@ -1,14 +1,9 @@
 import Type
+import Parser
+import Tests
+import Text.ParserCombinators.Parsec
 import Debug.Trace
 import Data.List(nub)
-
-data Expr    =  Var     Id
-             | App    Expr Expr
-             | Lam    Id Expr
-             | If     Expr Expr Expr
-             | Lit    Lit
-             | Case   Expr [(Pat, Expr)]
-             deriving (Eq, Show)
 
 tiLit (Int) = return (typeInt, [])
 tiLit (Bool) = return (typeBool, [])
@@ -23,7 +18,7 @@ tiPat g (PCon i pats) = do (ts, gs') <- tiPats g pats
                            t' <- freshVar
                            let t = tiContext g i
                            let s = unify t (foldr (-->) t' ts)
-                           return (apply s t', gs'/+/g)
+                           return (apply s t', g /+/ gs')
 
 tiPats g pats = do pss <- mapM (tiPat g) pats
                    let ts = concat [ [ts'] | (ts',_) <- pss ]
@@ -86,35 +81,6 @@ isUnique a = go Nothing a
             | otherwise = go s x zs
           go s@(Just False) _ _ = s
 
-
-ex1 = Lam "f" (Lam "x" (App (Var "f") (Var "x")))
-ex2 = Lam "x" (App (Var "x") (Var "x"))
-ex3 = Lam "g" (Lam "f" (Lam "x" (App (Var "g") (App (Var "f") (Var "x")))))
-true = Lit (LitB True)
-ex4 = If (Lit (LitB False)) (Lit (LitI 10)) (App (Lam "x" (Var "x")) (Lit (LitI 20)))
-ex5 = Lit (LitI 2)
--- ((\x.x)(\y.y))(True)
-ex6 = ((App (App (Lam "x" (Var "x")) (Lam "y" (Var "y"))) (Lit (LitB True))))
-ex7 = (App (Lam "x" (Var "x")) (If (Lit (LitB True)) (Lit (LitI 10)) (Lit (LitI 20))))
-ex8 = (App (If (Lit (LitB True)) (Lit (LitI 10)) (Lit (LitI 20))) (Lam "x" (Var "x")))
-exif = Lam "x" (If (Var "x") (Lit (LitI 1)) (Lit (LitI 0)))
-exif2 = Lam "x" (Lam "y" (If (Var "x") (Var "y") (Lit (LitI 0))))
-exif3 = Lam "x" (Lam "y" (Lam "z" (If (Var "x") (Var "y") (Var "z"))))
-exif4 = Lam "x" (Lam "y" (If (App (App (Var "==") (Var "x")) (Var "y")) (Var "x") (Var "y")))
-
--- Case Examples --
-ex1case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True))), (PCon "Nothing" [], Lit (LitB False))])
-ex2case = Lam "x" (Case (Var "x") [(PLit (LitB True), (Lit (LitI 1)))])
-ex3case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True)))])
-ex4case = Lam "x" (Case (Var "x") [(PLit (LitI 1), Lit (LitB True)), (PLit (LitI 2), Lit (LitB True)), (PLit (LitI 0), Lit (LitB False))])
-
--- Shouldn't work
-ex5case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"], (Lit (LitB True)))), ((PCon "Nothing" [], Lit (LitI 1)))])
-
--- Bin Ops --
-suc = Lam "x" (App (App (Var "+") (Var "x")) (Lit (LitI 1)))
-add = Lam "x" (Lam "y" (App (App (Var "+") (Var "x")) (Var "y")))
-
 context = [ "Just"    :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
             "Nothing" :>: TApp (TCon "Maybe") (TVar "a"),
             "+"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
@@ -128,3 +94,8 @@ context = [ "Just"    :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
             "<="      :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool))]
 
 infer e = runTI (tiExpr context e)
+infer1 e = fst $ runTI (tiExpr context e)
+hocuspocus s = do case parse start "" s of
+                      Right ans -> do traceM $ "\n" ++ show ans ++ "\n"
+                                      return (infer1 ans)
+                      otherwise -> error ("Parse error")

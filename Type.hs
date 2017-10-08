@@ -25,6 +25,14 @@ data Pat = PVar Id
          | PCon Id [Pat]
          deriving (Show, Eq)
 
+data Expr    = Var     Id
+          | App    Expr Expr
+          | Lam    Id Expr
+          | If     Expr Expr Expr
+          | Lit    Lit
+          | Case   Expr [(Pat, Expr)]
+          deriving (Eq, Show)
+
 typeInt, typeBool :: SimpleType
 typeInt  = TCon "Int"
 typeBool = TCon "Bool"
@@ -70,7 +78,7 @@ s1 @@ s2    = [ (u, apply s1 t) | (u,t) <- s2 ] ++ s1
 tEq (x:>:y) (u:>:v) = (x == u)
 
 (/+/)      :: [Assump] -> [Assump] -> [Assump]
-a1 /+/ a2    = nubBy tEq $ union a1 a2
+a1 /+/ a2    = nubBy tEq $ reverse $ union a1 a2
 ----------------------------
 class Subs t where
   apply :: Subst -> t -> t
