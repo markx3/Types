@@ -11,13 +11,14 @@ data SimpleType   = TVar Id
                   | TArr SimpleType SimpleType
                   | TCon Id
                   | TApp SimpleType SimpleType
+                  | TLit Lit
                   deriving Eq
 
-data Lit   = LitI Integer
+data Lit   = Int
+           | Bool
+           | LitI Int
            | LitB Bool
-           deriving (Eq, Show, Ord)
-
-data BinOp = Add | Sub | Mul | Div | Eql deriving (Eq, Ord, Show)
+           deriving (Eq, Show)
 
 data Pat = PVar Id
          | PLit Lit
@@ -28,14 +29,20 @@ typeInt, typeBool :: SimpleType
 typeInt  = TCon "Int"
 typeBool = TCon "Bool"
 
+nullSubst :: SimpleType -> Subst
+nullSubst i = [(show i,(TVar " "))]
+
 freshInst a = TVar a
 
 instance Show SimpleType where
    show (TVar i) = i
+   --show (TArr t a@(TArr t' t'')) = show t ++ "->" ++ show a
+   show (TArr t (TVar i)) = show t++"->"++show i
    show (TArr (TVar i) t) = i++"->"++show t
    show (TArr t t') = "("++show t++")"++"->"++show t' --- Colocar parenteses em TArr a@TArr (parentes só quando tem função)
    show (TApp t t') = show t ++ " " ++ show t'
    show (TCon u) = show u
+   show (TLit u) = show u
 
 --------------------------
 instance Functor TI where
@@ -80,9 +87,11 @@ instance Subs SimpleType where
                        Nothing -> TCon u
   apply s (TArr l r) =  (TArr (apply s l) (apply s r))
   apply s (TApp l r) =  (TApp (apply s l) (apply s r))
+  apply _ (TLit u)    = TLit u
 
 
   tv (TVar u)  = [u]
+  tv (TLit u)  = []
   tv (TCon u)  = [u]
   tv (TApp l r) = tv l `union` tv r
   tv (TArr l r) = tv l `union` tv r
@@ -114,6 +123,8 @@ mgu (TCon u,   TCon t   )   |  u == t = (Just [])
                             |  otherwise = Nothing
 mgu (TCon u,   t        )   =  varBind u t
 mgu (t     ,   TCon u   )   =  varBind u t
+mgu (TLit u,   TLit t   )   | u == t = (Just [])
+                            | otherwise = Nothing
 mgu (_,        _        )   =  Nothing
 
 unify t t' =  case mgu (t,t') of

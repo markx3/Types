@@ -7,9 +7,10 @@ data Expr    =  Var     Id
              | If     Expr Expr Expr
              | Lit    Lit
              | Case   Expr [(Pat, Expr)]
-             | Op     BinOp Expr Expr
              deriving (Eq, Show)
 
+tiLit (Int) = return (typeInt, [])
+tiLit (Bool) = return (typeBool, [])
 tiLit (LitI _) = return (typeInt, [])
 tiLit (LitB _) = return (typeBool, [])
 
@@ -36,8 +37,7 @@ tiAlts g alts    = do pss <- mapM (tiAlt g) alts
                       let ts = concat [ [ts'] | (ts',_,_) <- pss]
                           ss = concat [  ss'  | (_,ss',_) <- pss]
                           gs = concat [  gs'  | (_,_,gs') <- pss]
-                      return (ts, ss, gs)
-
+                      return (ts, ss, g/+/gs)
 
 tiContext g i = let (_ :>: t) = head (dropWhile (\(i' :>: _) -> i /= i' ) g) in t
 
@@ -49,8 +49,8 @@ tiExpr g (App e e') = do (t, s1) <- tiExpr g e
                          return (apply s3 b, s3 @@ s2 @@ s1)
 tiExpr g (Lam i e) = do b <- freshVar
                         (t, s)  <- tiExpr (g /+/ [i:>:b]) e
-                        traceM $ show s
-                        traceM $ show (g ++[i:>:b])
+                        traceM $ show s ++ "\n"
+                        traceM $ show (g ++[i:>:b]) ++ "\n"
                         return (apply s (b --> t), s)
 tiExpr g (Lit i) = do (t, s) <- tiLit i
                       return (t, s)
@@ -63,33 +63,42 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
                             return (apply s5 t'', s5 @@ s4 @@ s3 @@ s2 @@ s1)
 
 tiExpr g (Case e alts) = do (te, se)     <- tiExpr g e
-                            [(t', s', g')] <- mapM (tiAlt (apply se g)) alts
+                            (t', s', g') <- tiAlts (apply se g) alts
+                            -- traceM $ "alts: " ++ show t'
+                            -- traceM $ "alts subs: " ++ show s'
+                            -- traceM $ "alts env: " ++ show g'
+                            -- traceM $ "expr type: " ++ show te
+                            -- traceM $ "expr subs: " ++ show se
+                            fv <- freshVar
+                            let s'' = unify' fv t'
+                                s''' = s' @@ s'' @@ se
 
-                            traceM $ "alts: " ++ show t'
-                            traceM $ "alts subs: " ++ show s'
-                            traceM $ "alts env: " ++ show g'
-                            traceM $ "expr type: " ++ show te
-                            traceM $ "expr subs: " ++ show se
-                            let s'' = unify te t'
                             traceM $ "s'' = " ++ show s''
-                            traceM $ "apply: " ++ show (apply s'' te)
-                            return (apply s'' te, [])
+                            --traceM $ "s'' = " ++ show s''
+                            --traceM $ "apply: " ++ show (apply s'' te)
+                            return (fv, s''' @@ (nullSubst te))
 
-tiExpr g (Op op e e') = do (t1, s1) <- tiExpr g e
-                           (t2, s2) <- tiExpr g e
-                           fv <- freshVar
-                           traceM $ "freshVar: " ++ show fv
-                           let s3    = unify (t1 --> (t2 --> fv)) (getOp op)
-                           traceM $ "s3: " ++ show s3
-                           --let u = unify (t1 --> t2) (getOp op)
-                           return (apply s3 fv, s1 @@ s2 @@ s3)
+unify' t [x] = unify t x
+unify' t (x:xs) = let s = unify t x in unify' (apply s t) xs
 
-getOp op = case op of
-                Add -> ((typeInt --> (typeInt --> typeInt)))
-                Sub -> ((typeInt --> (typeInt --> typeInt)))
-                Mul -> ((typeInt --> (typeInt --> typeInt)))
-                Div -> ((typeInt --> (typeInt --> typeInt)))
-                Eql -> ((typeInt --> (typeInt --> typeBool)))
+-- unify'' t [x]     = unify t x
+-- unify'' t (x:xs) = let s = unify t x in unify' (apply s t) xs
+
+appParametros i [] = i
+appParametros (TArr a i) (t:ts) = appParametros i ts
+
+-- tiExpr g (Case e alts) = do (te, se)     <- tiExpr g e
+--                             (t', s', g') <- tiAlts g alts
+--
+--                             traceM $ "alts: " ++ show t'
+--                             traceM $ "alts subs: " ++ show s'
+--                             traceM $ "alts env: " ++ show g'
+--                             traceM $ "expr type: " ++ show te
+--                             traceM $ "expr subs: " ++ show se
+--                             let s'' = foldr unify te t'
+--                             traceM $ "s'' = " ++ show s''
+--                             traceM $ "apply: " ++ show (apply s'' te)
+--                             return (apply s'' te, [])
 
 
 
@@ -105,23 +114,34 @@ ex7 = (App (Lam "x" (Var "x")) (If (Lit (LitB True)) (Lit (LitI 10)) (Lit (LitI 
 ex8 = (App (If (Lit (LitB True)) (Lit (LitI 10)) (Lit (LitI 20))) (Lam "x" (Var "x")))
 exif = Lam "x" (If (Var "x") (Lit (LitI 1)) (Lit (LitI 0)))
 exif2 = Lam "x" (Lam "y" (If (Var "x") (Var "y") (Lit (LitI 0))))
+exif3 = Lam "x" (Lam "y" (Lam "z" (If (Var "x") (Var "y") (Var "z"))))
+exif4 = Lam "x" (Lam "y" (If (App (App (Var "==") (Var "x")) (Var "y")) (Var "x") (Var "y")))
+
 -- excase = Lam "x" (Case (Var "x") [((PCon "Just" [Var "x"]), (Var "x")))
 ex1case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True))), (PCon "Nothing" [], Lit (LitB False))])
-ex2case = Lam "x" (Case (Var "x") [(PLit (LitB True), (Var "x"))])
+ex2case = Lam "x" (Case (Var "x") [(PLit (LitB True), (Lit (LitI 1)))])
 ex3case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True)))])
 
 
 -- Bin Ops --
-suc = Lam "x" (Op Add (Var "x") (Lit (LitI 1)))
-add = Lam "x" (Lam "y" (Op Add (Var "x") (Var "y")))
-eq  = Lam "x" (Lam "y" (Op Eql (Var "x") (Var "y")))
+suc = Lam "x" (App (App (Var "+") (Var "x")) (Lit (LitI 1)))
+add = Lam "x" (Lam "y" (App (App (Var "+") (Var "x")) (Var "y")))
 
 
 
-contexto = ["Just" :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
-            "Nothing" :>: TApp (TCon "Maybe") (TVar "a")]
+context = [ "Just"    :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
+            "Nothing" :>: TApp (TCon "Maybe") (TVar "a"),
+            "+"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
+            "-"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
+            "*"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
+            "/"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
+            "=="      :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool)),
+            ">"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool)),
+            ">="      :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool)),
+            "<"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool)),
+            "<="      :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool))]
 
-infer e = runTI (tiExpr contexto e)
+infer e = runTI (tiExpr context e)
 
 
 
