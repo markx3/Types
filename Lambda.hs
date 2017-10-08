@@ -2,7 +2,6 @@ import Type
 import Debug.Trace
 import Data.List(nub)
 
-
 data Expr    =  Var     Id
              | App    Expr Expr
              | Lam    Id Expr
@@ -59,15 +58,33 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
                             (t'', s3) <- tiExpr (apply s2 g) e''
                             let s4 = unify t typeBool
                                 s5 = unify t' t''
-                            -- traceM $ show (s5)
                             return (apply s5 t'', s5 @@ s4 @@ s3 @@ s2 @@ s1)
 
 tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
                             (t', s', g') <- tiAlts (apply s g) alts te
                             fv <- freshVar
                             let s'' = map (unify (te --> fv)) t'
-                            let s''' = nub $ concat s''
-                            return (apply (s''') fv, s''' @@ s @@ s')
+                                s''' = nub $ concat s''
+
+                            case findRepeated (map fst s''') of
+                                Just True -> return (apply s''' fv, s''' @@ s @@ s')
+                                Nothing -> error ("oops")
+
+findRepeated [] = Just True
+findRepeated a@(x:xs) = case isUnique x a of
+    Just True -> findRepeated xs
+    otherwise -> Nothing
+
+isUnique :: Eq a => a -> [a] -> Maybe Bool
+isUnique a = go Nothing a
+    where go s _ [] = s
+          go s@Nothing x (z:zs)
+            | x == z = go (Just True) x zs
+            | otherwise = go s x zs
+          go s@(Just True) x (z:zs)
+            | x == z = Just False
+            | otherwise = go s x zs
+          go s@(Just False) _ _ = s
 
 
 ex1 = Lam "f" (Lam "x" (App (Var "f") (Var "x")))
@@ -90,6 +107,9 @@ ex1case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True)))
 ex2case = Lam "x" (Case (Var "x") [(PLit (LitB True), (Lit (LitI 1)))])
 ex3case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True)))])
 ex4case = Lam "x" (Case (Var "x") [(PLit (LitI 1), Lit (LitB True)), (PLit (LitI 2), Lit (LitB True)), (PLit (LitI 0), Lit (LitB False))])
+
+-- Shouldn't work
+ex5case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"], (Lit (LitB True)))), ((PCon "Nothing" [], Lit (LitI 1)))])
 
 -- Bin Ops --
 suc = Lam "x" (App (App (Var "+") (Var "x")) (Lit (LitI 1)))
