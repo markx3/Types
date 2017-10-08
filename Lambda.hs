@@ -31,7 +31,7 @@ tiPats g pats = do pss <- mapM (tiPat g) pats
 
 tiAlt g (pat, e) = do (t', s) <- tiExpr g e
                       (t, g') <- tiPats (apply s g) [pat]
-                      return (foldr (-->) t' t, s, (g' /+/ g))
+                      return (foldr (-->) t' t, s, (g /+/ g'))
 
 tiAlts g alts    = do pss <- mapM (tiAlt g) alts
                       let ts = concat [ [ts'] | (ts',_,_) <- pss]
@@ -67,12 +67,16 @@ tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
                             traceM $ "t' =" ++ show t'
                             traceM $ "s' =" ++ show s'
                             fv <- freshVar
-                            let s'' = unify' (te --> fv) t'
+                            let tefv = te --> fv
+                            let s'' = unify' (tefv) t'
                             let s'''  = s @@ s' @@ s'' -- @@ s'''
                             return (apply s''' fv, s''')
 
 unify' t [x] = unify t x
 unify' t (x:xs) = let s = unify t x in unify' (apply s t) xs
+
+
+removeTI (TI x) = x
 
 -- unify'' t [x]     = unify t x
 -- unify'' t (x:xs) = let s = unify t x in unify' (apply s t) xs
@@ -112,6 +116,7 @@ ex1case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True)))
 ex2case = Lam "x" (Case (Var "x") [(PLit (LitB True), (Lit (LitI 1)))])
 ex3case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True)))])
 
+ex4case = Lam "x" (Case (Var "x") [(PLit (LitI 1), Lit (LitB True)), (PLit (LitI 2), Lit (LitB True)), (PLit (LitI 0), Lit (LitB False))])
 
 -- Bin Ops --
 suc = Lam "x" (App (App (Var "+") (Var "x")) (Lit (LitI 1)))
