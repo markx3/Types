@@ -29,9 +29,6 @@ typeInt, typeBool :: SimpleType
 typeInt  = TCon "Int"
 typeBool = TCon "Bool"
 
-nullSubst :: SimpleType -> Subst
-nullSubst i = [(show i,(TVar " "))]
-
 freshInst a = TVar a
 
 instance Show SimpleType where

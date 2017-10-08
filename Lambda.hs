@@ -1,5 +1,7 @@
 import Type
 import Debug.Trace
+import Data.List(nub, intersect, union, nubBy)
+
 
 data Expr    =  Var     Id
              | App    Expr Expr
@@ -33,11 +35,13 @@ tiAlt g (pat, e) = do (t', s) <- tiExpr g e
                       (t, g') <- tiPats (apply s g) [pat]
                       return (foldr (-->) t' t, s, (g /+/ g'))
 
-tiAlts g alts    = do pss <- mapM (tiAlt g) alts
+tiAlts g alts t  = do pss <- mapM (tiAlt g) alts
                       let ts = concat [ [ts'] | (ts',_,_) <- pss]
                           ss = concat [  ss'  | (_,ss',_) <- pss]
                           gs = concat [  gs'  | (_,_,gs') <- pss]
-                      return (ts, ss, g++gs)
+                      fv <- freshVar
+                      let s' = map (unify (t --> fv)) ts
+                      return (ts, nub $ concat s', g/+/gs)
 
 tiContext g i = let (_ :>: t) = head (dropWhile (\(i' :>: _) -> i /= i' ) g) in t
 
@@ -63,18 +67,18 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
                             return (apply s5 t'', s5 @@ s4 @@ s3 @@ s2 @@ s1)
 
 tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
-                            (t', s', g') <- tiAlts (apply s g) alts
+                            (t', s', g') <- tiAlts (apply s g) alts te
                             traceM $ "t' =" ++ show t'
                             traceM $ "s' =" ++ show s'
                             fv <- freshVar
-                            let tefv = te --> fv
-                            let s'' = unify' (tefv) t'
-                            let s'''  = s @@ s' @@ s'' -- @@ s'''
-                            return (apply s''' fv, s''')
+                            let s'' = map (unify (te --> fv)) t'
+                            let s''' = nub $ concat s''
+                            return (apply (s''') fv, s''')
 
 unify' t [x] = unify t x
 unify' t (x:xs) = let s = unify t x in unify' (apply s t) xs
 
+--unify'' t (x:xs) = foldr (unify) (unify t x) xs
 
 removeTI (TI x) = x
 
@@ -115,7 +119,6 @@ exif4 = Lam "x" (Lam "y" (If (App (App (Var "==") (Var "x")) (Var "y")) (Var "x"
 ex1case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True))), (PCon "Nothing" [], Lit (LitB False))])
 ex2case = Lam "x" (Case (Var "x") [(PLit (LitB True), (Lit (LitI 1)))])
 ex3case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True)))])
-
 ex4case = Lam "x" (Case (Var "x") [(PLit (LitI 1), Lit (LitB True)), (PLit (LitI 2), Lit (LitB True)), (PLit (LitI 0), Lit (LitB False))])
 
 -- Bin Ops --
