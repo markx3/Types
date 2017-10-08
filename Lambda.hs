@@ -15,6 +15,7 @@ tiLit (LitI _) = return (typeInt, [])
 tiLit (LitB _) = return (typeBool, [])
 
 tiPat g (PVar i) = do let b = tiContext g i
+                      traceM $ "b = " ++ show b
                       return (b, g/+/[i:>:b])
 tiPat g (PLit i) = do (t, s) <- tiLit i
                       return (t, g)
@@ -64,28 +65,22 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
 
 tiExpr g (Case e alts) = do (te, se)     <- tiExpr g e
                             (t', s', g') <- tiAlts (apply se g) alts
-                            -- traceM $ "alts: " ++ show t'
-                            -- traceM $ "alts subs: " ++ show s'
-                            -- traceM $ "alts env: " ++ show g'
-                            -- traceM $ "expr type: " ++ show te
-                            -- traceM $ "expr subs: " ++ show se
+                            traceM $ show s'
                             fv <- freshVar
                             let s'' = unify' fv t'
-                                s''' = s' @@ s'' @@ se
+                            --let s''' = unify te fv
+                            let s4  = se @@ s' @@ s'' -- @@ s'''
 
                             traceM $ "s'' = " ++ show s''
                             --traceM $ "s'' = " ++ show s''
                             --traceM $ "apply: " ++ show (apply s'' te)
-                            return (fv, s''' @@ (nullSubst te))
+                            return (apply s4 fv, s4)
 
 unify' t [x] = unify t x
 unify' t (x:xs) = let s = unify t x in unify' (apply s t) xs
 
 -- unify'' t [x]     = unify t x
 -- unify'' t (x:xs) = let s = unify t x in unify' (apply s t) xs
-
-appParametros i [] = i
-appParametros (TArr a i) (t:ts) = appParametros i ts
 
 -- tiExpr g (Case e alts) = do (te, se)     <- tiExpr g e
 --                             (t', s', g') <- tiAlts g alts
