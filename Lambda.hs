@@ -1,6 +1,6 @@
 import Type
 import Debug.Trace
-import Data.List(nub, intersect, union, nubBy)
+import Data.List(nub)
 
 
 data Expr    =  Var     Id
@@ -39,9 +39,7 @@ tiAlts g alts t  = do pss <- mapM (tiAlt g) alts
                       let ts = concat [ [ts'] | (ts',_,_) <- pss]
                           ss = concat [  ss'  | (_,ss',_) <- pss]
                           gs = concat [  gs'  | (_,_,gs') <- pss]
-                      fv <- freshVar
-                      let s' = map (unify (t --> fv)) ts
-                      return (ts, nub $ concat s', g/+/gs)
+                      return (ts, ss, g/+/gs)
 
 tiContext g i = let (_ :>: t) = head (dropWhile (\(i' :>: _) -> i /= i' ) g) in t
 
@@ -53,8 +51,6 @@ tiExpr g (App e e') = do (t, s1) <- tiExpr g e
                          return (apply s3 b, s3 @@ s2 @@ s1)
 tiExpr g (Lam i e) = do b <- freshVar
                         (t, s)  <- tiExpr (g /+/ [i:>:b]) e
-                        --traceM $ show s ++ "\n"
-                        --traceM $ show (g ++[i:>:b]) ++ "\n"
                         return (apply s (b --> t), s)
 tiExpr g (Lit i) = do (t, s) <- tiLit i
                       return (t, s)
@@ -68,36 +64,10 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
 
 tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
                             (t', s', g') <- tiAlts (apply s g) alts te
-                            traceM $ "t' =" ++ show t'
-                            traceM $ "s' =" ++ show s'
                             fv <- freshVar
                             let s'' = map (unify (te --> fv)) t'
                             let s''' = nub $ concat s''
-                            return (apply (s''') fv, s''')
-
-unify' t [x] = unify t x
-unify' t (x:xs) = let s = unify t x in unify' (apply s t) xs
-
---unify'' t (x:xs) = foldr (unify) (unify t x) xs
-
-removeTI (TI x) = x
-
--- unify'' t [x]     = unify t x
--- unify'' t (x:xs) = let s = unify t x in unify' (apply s t) xs
-
--- tiExpr g (Case e alts) = do (te, se)     <- tiExpr g e
---                             (t', s', g') <- tiAlts g alts
---
---                             traceM $ "alts: " ++ show t'
---                             traceM $ "alts subs: " ++ show s'
---                             traceM $ "alts env: " ++ show g'
---                             traceM $ "expr type: " ++ show te
---                             traceM $ "expr subs: " ++ show se
---                             let s'' = foldr unify te t'
---                             traceM $ "s'' = " ++ show s''
---                             traceM $ "apply: " ++ show (apply s'' te)
---                             return (apply s'' te, [])
-
+                            return (apply (s''') fv, s''' @@ s @@ s')
 
 
 ex1 = Lam "f" (Lam "x" (App (Var "f") (Var "x")))
@@ -115,7 +85,7 @@ exif2 = Lam "x" (Lam "y" (If (Var "x") (Var "y") (Lit (LitI 0))))
 exif3 = Lam "x" (Lam "y" (Lam "z" (If (Var "x") (Var "y") (Var "z"))))
 exif4 = Lam "x" (Lam "y" (If (App (App (Var "==") (Var "x")) (Var "y")) (Var "x") (Var "y")))
 
--- excase = Lam "x" (Case (Var "x") [((PCon "Just" [Var "x"]), (Var "x")))
+-- Case Examples --
 ex1case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True))), (PCon "Nothing" [], Lit (LitB False))])
 ex2case = Lam "x" (Case (Var "x") [(PLit (LitB True), (Lit (LitI 1)))])
 ex3case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"]), (Lit (LitB True)))])
@@ -124,8 +94,6 @@ ex4case = Lam "x" (Case (Var "x") [(PLit (LitI 1), Lit (LitB True)), (PLit (LitI
 -- Bin Ops --
 suc = Lam "x" (App (App (Var "+") (Var "x")) (Lit (LitI 1)))
 add = Lam "x" (Lam "y" (App (App (Var "+") (Var "x")) (Var "y")))
-
-
 
 context = [ "Just"    :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
             "Nothing" :>: TApp (TCon "Maybe") (TVar "a"),
@@ -140,18 +108,3 @@ context = [ "Just"    :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
             "<="      :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool))]
 
 infer e = runTI (tiExpr context e)
-
-
-
-
-mycase x = case x of
-    Just x -> True
-
-othercase = (\x -> case x of
-                        Just x -> True)
-
--- tiExpr g (Case e alts) = do (ts, ss, gs) <- tiAlts g alts
---                             (te, se)     <- tiExpr (g /+/ gs) e
---                             t' <- freshVar
---                             let s''       = unify te (foldr (-->) t' ts)
---                             return (apply s'' te, s'' @@ se)
