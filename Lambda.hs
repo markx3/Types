@@ -58,10 +58,7 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
 tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
                             fv <- freshVar
                             (t', s', g') <- tiAlts (apply s g) alts fv
-                            traceM $ "t' = " ++ show t'
                             let s'' = mapM (unify (te --> fv)) t'
-                            traceM $ "s'' = " ++ show s''
-
                             let s''' = nub $ concat s''
                             case findRepeated (map fst s''') of
                                 Just True -> return (apply s''' fv, s''' @@ s @@ s')
