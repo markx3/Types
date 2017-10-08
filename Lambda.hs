@@ -10,7 +10,7 @@ tiLit (Bool) = return (typeBool, [])
 tiLit (LitI _) = return (typeInt, [])
 tiLit (LitB _) = return (typeBool, [])
 
-tiPat g (PVar i) = do let b = tiContext g i
+tiPat g (PVar i) = do b <- freshVar
                       return (b, g/+/[i:>:b])
 tiPat g (PLit i) = do (t, s) <- tiLit i
                       return (t, g)
@@ -56,11 +56,13 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
                             return (apply s5 t'', s5 @@ s4 @@ s3 @@ s2 @@ s1)
 
 tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
-                            (t', s', g') <- tiAlts (apply s g) alts te
                             fv <- freshVar
-                            let s'' = map (unify (te --> fv)) t'
-                                s''' = nub $ concat s''
+                            (t', s', g') <- tiAlts (apply s g) alts fv
+                            traceM $ "t' = " ++ show t'
+                            let s'' = mapM (unify (te --> fv)) t'
+                            traceM $ "s'' = " ++ show s''
 
+                            let s''' = nub $ concat s''
                             case findRepeated (map fst s''') of
                                 Just True -> return (apply s''' fv, s''' @@ s @@ s')
                                 Nothing -> error ("oops")
@@ -83,6 +85,8 @@ isUnique a = go Nothing a
 
 context = [ "Just"    :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
             "Nothing" :>: TApp (TCon "Maybe") (TVar "a"),
+            "Left"    :>: TArr (TVar "a") (TApp (TApp (TCon "Either") (TVar "a")) (TVar "b")),
+            "Right"   :>: TArr (TVar "b") (TApp (TApp (TCon "Either") (TVar "a")) (TVar "b")),
             "+"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
             "-"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
             "*"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
