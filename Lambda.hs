@@ -53,20 +53,20 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
                             (t'', s3) <- tiExpr (apply s2 g) e''
                             let s4 = unify t typeBool
                                 s5 = unify t' t''
-                            return (apply s5 t'', s5 @@ s4 @@ s3 @@ s2 @@ s1)
+                            return (t'', s5 @@ s4 @@ s3 @@ s2 @@ s1)
 
 tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
                             fv <- freshVar
                             (t', s', g') <- tiAlts (apply s g) alts fv
                             let s'' = mapM (unify (te --> fv)) t'
                             let s''' = nub $ concat s''
-                            case findRepeated (map fst s''') of
+                            case checkOverlap (map fst s''') of
                                 Just True -> return (apply s''' fv, s''' @@ s @@ s')
-                                Nothing -> error ("oops")
+                                Nothing -> error ("Error: non-unique substitutions")
 
-findRepeated [] = Just True
-findRepeated a@(x:xs) = case isUnique x a of
-    Just True -> findRepeated xs
+checkOverlap [] = Just True
+checkOverlap a@(x:xs) = case isUnique x a of
+    Just True -> checkOverlap xs
     otherwise -> Nothing
 
 isUnique :: Eq a => a -> [a] -> Maybe Bool

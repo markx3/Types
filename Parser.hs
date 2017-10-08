@@ -26,7 +26,7 @@ term = do reserved "if"
          <|> do reserved "case"
                 e <- term
                 reserved "of"
-                mcases <- sepBy cases (reservedOp "|")
+                mcases <- sepBy cases $ reservedOp "|"
                 return $ Case e mcases
          <|> expr
          <|> do true <- reserved "true"
@@ -81,15 +81,15 @@ delterm = do x<-identifier
 expr :: Parser Expr
 expr = buildExpressionParser table appl_expr
     where
-        table = [ [Postfix ((reservedOp "+") >> return (App (Var "+")))],
-                  [Postfix ((reservedOp "-") >> return (App (Var "-")))],
-                  [Postfix ((reservedOp ">") >> return (App (Var ">")))],
-                  [Postfix ((reservedOp "<") >> return (App (Var "<")))],
+        table = [ [Postfix ((reservedOp "+")  >> return (App (Var "+")))],
+                  [Postfix ((reservedOp "-")  >> return (App (Var "-")))],
+                  [Postfix ((reservedOp ">")  >> return (App (Var ">")))],
+                  [Postfix ((reservedOp "<")  >> return (App (Var "<")))],
                   [Postfix ((reservedOp ">=") >> return (App (Var ">=")))],
                   [Postfix ((reservedOp "<=") >> return (App (Var "<=")))],
                   [Postfix ((reservedOp "==") >> return (App (Var "==")))],
-                  [Postfix ((reservedOp "*") >> return (App (Var "*")))],
-                  [Postfix ((reservedOp "/") >> return (App (Var "/")))],
+                  [Postfix ((reservedOp "*")  >> return (App (Var "*")))],
+                  [Postfix ((reservedOp "/")  >> return (App (Var "/")))],
                   [Infix (return (App)) AssocLeft] ]
 
 appl_expr :: Parser Expr
