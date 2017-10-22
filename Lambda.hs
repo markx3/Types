@@ -58,13 +58,18 @@ tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
 tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
                             fv           <- freshVar
                             (t', s', g') <- tiAlts (apply s g) alts
-                            let s''       = nubBy idEq $ concatMap (unify (te --> fv)) t'
+                            --let s''       = nub $ concatMap (unify (te --> fv)) t'
+                            let s''       = unifyAll (te --> fv) t' []
                             traceM $ show s''
-                            case checkOverlap (map fst s'') of
-                                 Just True -> return (apply s'' fv, s'' @@ s' @@ s)
-                                 Nothing -> error ("Error: non-unique substitutions")
+                            return (apply s'' fv, s'' @@ s' @@ s)
+                            -- case checkOverlap (map fst s'') of
+                            --      Just True -> return (apply s'' fv, s'' @@ s' @@ s)
+                            --      Nothing -> error ("Error: non-unique substitutions")
 
 tiExpr g (Let (x,e) e') = undefined
+
+unifyAll t []     s = s
+unifyAll t (x:xs) s = let u = unify t x in unifyAll (apply u t) xs (s @@ u)
 
 checkOverlap [] = Just True
 checkOverlap a@(x:xs) = case isUnique x a of
