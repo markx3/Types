@@ -6,13 +6,17 @@ type Id = String
 data TI a = TI (Index -> (a, Index))
 type Subst  = [(Id, SimpleType)]
 data Assump = Id :>: SimpleType deriving (Eq, Show)
+--data Assump = Id :>: Type deriving (Eq, Show)      {--TODO Alterar--}
 
 data SimpleType   = TVar Id
                   | TArr SimpleType SimpleType
                   | TCon Id
                   | TApp SimpleType SimpleType
                   | TLit Lit
+                  | TGen Int
                   deriving Eq
+
+data Type = Forall SimpleType
 
 data Lit   = Int
            | Bool
@@ -25,31 +29,25 @@ data Pat = PVar Id
          | PCon Id [Pat]
          deriving (Show, Eq)
 
-data Expr    = Var     Id
+data Expr = Var    Id
           | App    Expr Expr
           | Lam    Id Expr
           | If     Expr Expr Expr
           | Lit    Lit
           | Case   Expr [(Pat, Expr)]
+          | Let    (Id, Expr) Expr -- Numa situação real seria [(Id, Expr)]
           deriving (Eq, Show)
 
 typeInt, typeBool :: SimpleType
 typeInt  = TCon "Int"
 typeBool = TCon "Bool"
 
-nullSubst :: SimpleType -> Subst
-nullSubst i = [(show i,(TVar " "))]
-
-freshInst a = TVar a
-
 instance Show SimpleType where
    show (TVar i) = i
-   --show (TArr t a@(TArr t' t'')) = show t ++ "->" ++ show a
-   show (TArr t (TVar i)) = show t++"->"++show i
-   show (TArr (TVar i) t) = i++"->"++show t
-   show (TArr t t') = "("++show t++")"++"->"++show t' --- Colocar parenteses em TArr a@TArr (parentes só quando tem função)
+   show (TArr a@(TArr _ _) t'') = "("++show a++")"++"->"++show t''
+   show (TArr t t') = show t++"->"++show t' --- Colocar parenteses em TArr a@TArr (parentes só quando tem função)
    show (TApp t t') = show t ++ " " ++ show t'
-   show (TCon u) = show u
+   show (TCon u) = u
    show (TLit u) = show u
 
 --------------------------
@@ -76,6 +74,7 @@ infixr 4 @@
 s1 @@ s2    = [ (u, apply s1 t) | (u,t) <- s2 ] ++ s1
 
 tEq (x:>:y) (u:>:v) = (x == u)
+idEq (a,b) (x,y) = (a == x)
 
 (/+/)      :: [Assump] -> [Assump] -> [Assump]
 a1 /+/ a2    = nubBy tEq $ reverse $ union a1 a2
@@ -131,7 +130,7 @@ mgu (TCon u,   TCon t   )   |  u == t = (Just [])
                             |  otherwise = Nothing
 mgu (TCon u,   t        )   =  varBind u t
 mgu (t     ,   TCon u   )   =  varBind u t
-mgu (TLit u,   TLit t   )   | u == t = (Just [])
+mgu (TLit u,   TLit t   )   | u == t || checkLit u t = (Just [])
                             | otherwise = Nothing
 mgu (_,        _        )   =  Nothing
 
@@ -139,3 +138,7 @@ unify t t' =  case mgu (t,t') of
     Nothing -> error ("unification: trying to unify\n" ++ (show t) ++ "\nand\n" ++
                       (show t'))
     Just s  -> s
+
+checkLit Bool (LitB _) = True
+checkLit Int (LitI _)  = True
+checkLit _ _           = False

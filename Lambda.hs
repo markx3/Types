@@ -3,7 +3,7 @@ import Parser
 import Tests
 import Text.ParserCombinators.Parsec
 import Debug.Trace
-import Data.List(nub)
+import Data.List(nub, nubBy)
 
 tiLit (Int) = return (typeInt, [])
 tiLit (Bool) = return (typeBool, [])
@@ -29,7 +29,7 @@ tiAlt g (pat, e) = do (t', s) <- tiExpr g e
                       (t, g') <- tiPats (apply s g) [pat]
                       return (foldr (-->) t' t, s, (g /+/ g'))
 
-tiAlts g alts t  = do pss <- mapM (tiAlt g) alts
+tiAlts g alts    = do pss <- mapM (tiAlt g) alts
                       let ts = concat [ [ts'] | (ts',_,_) <- pss]
                           ss = concat [  ss'  | (_,ss',_) <- pss]
                           gs = concat [  gs'  | (_,_,gs') <- pss]
@@ -38,10 +38,10 @@ tiAlts g alts t  = do pss <- mapM (tiAlt g) alts
 tiContext g i = let (_ :>: t) = head (dropWhile (\(i' :>: _) -> i /= i' ) g) in t
 
 tiExpr g (Var i) = return (tiContext g i, [])
-tiExpr g (App e e') = do (t, s1) <- tiExpr g e
+tiExpr g (App e e') = do (t,  s1) <- tiExpr g e
                          (t', s2) <- tiExpr (apply s1 g) e'
-                         b <- freshVar
-                         let s3 = unify (apply s2 t) (t' --> b)
+                         b        <- freshVar
+                         let  s3   = unify (apply s2 t) (t' --> b)
                          return (apply s3 b, s3 @@ s2 @@ s1)
 tiExpr g (Lam i e) = do b <- freshVar
                         (t, s)  <- tiExpr (g /+/ [i:>:b]) e
@@ -51,18 +51,20 @@ tiExpr g (Lit i) = do (t, s) <- tiLit i
 tiExpr g (If e e' e'') = do (t,   s1) <- tiExpr g e
                             (t',  s2) <- tiExpr (apply s1 g) e'
                             (t'', s3) <- tiExpr (apply s2 g) e''
-                            let s4 = unify t typeBool
-                                s5 = unify t' t''
+                            let   s4   = unify t typeBool
+                                  s5   = unify t' t''
                             return (t'', s5 @@ s4 @@ s3 @@ s2 @@ s1)
 
 tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
-                            fv <- freshVar
-                            (t', s', g') <- tiAlts (apply s g) alts fv
-                            let s'' = mapM (unify (te --> fv)) t'
-                            let s''' = nub $ concat s''
-                            case checkOverlap (map fst s''') of
-                                Just True -> return (apply s''' fv, s''' @@ s @@ s')
-                                Nothing -> error ("Error: non-unique substitutions")
+                            fv           <- freshVar
+                            (t', s', g') <- tiAlts (apply s g) alts
+                            let s''       = nubBy idEq $ concatMap (unify (te --> fv)) t'
+                            traceM $ show s''
+                            case checkOverlap (map fst s'') of
+                                 Just True -> return (apply s'' fv, s'' @@ s' @@ s)
+                                 Nothing -> error ("Error: non-unique substitutions")
+
+tiExpr g (Let (x,e) e') = undefined
 
 checkOverlap [] = Just True
 checkOverlap a@(x:xs) = case isUnique x a of
@@ -80,6 +82,7 @@ isUnique a = go Nothing a
             | otherwise = go s x zs
           go s@(Just False) _ _ = s
 
+{--Fazer for all Just... --}
 context = [ "Just"    :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
             "Nothing" :>: TApp (TCon "Maybe") (TVar "a"),
             "Left"    :>: TArr (TVar "a") (TApp (TApp (TCon "Either") (TVar "a")) (TVar "b")),
@@ -100,3 +103,7 @@ hocuspocus s = do case parse start "" s of
                       Right ans -> do traceM $ "\n" ++ show ans ++ "\n"
                                       return (infer1 ans)
                       otherwise -> error ("Parse error")
+
+test x = case x of
+    True -> Just 1
+    False -> Nothing
