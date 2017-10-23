@@ -1,5 +1,6 @@
 module Type where
 import Data.List(nub, intersect, union, nubBy)
+import Data.Map(fromList)
 
 type Index = Int
 type Id = String
@@ -16,7 +17,7 @@ data SimpleType   = TVar Id
                   | TGen Int
                   deriving Eq
 
-data Type = Forall SimpleType
+data Type = Forall SimpleType deriving (Eq, Show)
 
 data Lit   = Int
            | Bool
@@ -35,8 +36,9 @@ data Expr = Var    Id
           | If     Expr Expr Expr
           | Lit    Lit
           | Case   Expr [(Pat, Expr)]
-          | Let    (Id, Expr) Expr -- Numa situação real seria [(Id, Expr)]
+          | Let    (Id, Expr) Expr   -- Numa situação real seria [(Id, Expr)]
           deriving (Eq, Show)
+
 
 typeInt, typeBool :: SimpleType
 typeInt  = TCon "Int"
@@ -45,7 +47,7 @@ typeBool = TCon "Bool"
 instance Show SimpleType where
    show (TVar i) = i
    show (TArr a@(TArr _ _) t'') = "("++show a++")"++"->"++show t''
-   show (TArr t t') = show t++"->"++show t' --- Colocar parenteses em TArr a@TArr (parentes só quando tem função)
+   show (TArr t t') = show t++"->"++show t'
    show (TApp t t') = show t ++ " " ++ show t'
    show (TCon u) = u
    show (TLit u) = show u
@@ -77,7 +79,7 @@ tEq (x:>:y) (u:>:v) = (x == u)
 idEq (a,b) (x,y) = (a == x)
 
 (/+/)      :: [Assump] -> [Assump] -> [Assump]
-a1 /+/ a2    = nubBy tEq $ reverse $ union a1 a2
+a1 /+/ a2    = nubBy tEq $ reverse $ a1 `union` a2
 ----------------------------
 class Subs t where
   apply :: Subst -> t -> t
@@ -142,3 +144,13 @@ unify t t' =  case mgu (t,t') of
 checkLit Bool (LitB _) = True
 checkLit Int (LitI _)  = True
 checkLit _ _           = False
+
+quantify vs qt = (apply s qt)
+    where
+        vs' = [ v | v <- tv qt, v `elem` vs]
+        s = zip vs' (map TGen [0..])
+
+inst g t = do
+    g' <- mapM (const freshVar) g
+    let s = zip g g'
+    return (apply s t)

@@ -26,3 +26,8 @@ ex5case = Lam "x" (Case (Var "x") [((PCon "Just" [PVar "x"], (Lit (LitB True))))
 -- Bin Ops --
 suc = Lam "x" (App (App (Var "+") (Var "x")) (Lit (LitI 1)))
 add = Lam "x" (Lam "y" (App (App (Var "+") (Var "x")) (Var "y")))
+
+-- Let --
+lettest = Lam "f" (Let ("g", (Lam "x" (App (Var "f") (Var "x")))) (Var "g") )
+lettest1 = Lam "f" (Let ("f", (Lam "x" (Var "x"))) (Let ("g", (App (Var "f") (Lit (LitB True)))) (App (Var "f") (Lit (LitI 3)))))
+lettest2 = Lam "f" (Let ("g", (Lam "x" (Var "x"))) (Var "g"))

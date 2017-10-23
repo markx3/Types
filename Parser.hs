@@ -33,6 +33,14 @@ term = do reserved "if"
                 return (Lit (LitB True))
          <|> do false <- reserved "false"
                 return (Lit (LitB False))
+         <|> do reserved "let"
+                x <- identifier
+                reserved "="
+                e1 <- term
+                reserved "in"
+                e2 <- term
+                return $ Let (x, e1) e2
+
 
 cases = do mpat <- pat
            reserved "->"
@@ -49,7 +57,7 @@ pat = do p <- parens pcon
               return p
 
 pcon = do u <- upper
-          x <- many1 letter
+          x <- many letter
           spaces
           p <- many pat
           return (PCon (u:x) p)
@@ -65,13 +73,10 @@ plit = do x <- natural
           <|>
           do f <- reserved "false"
              return (PLit (LitB False))
--- an application (e0 e1 e2 .. en)
--- where ei are self-delimited expressions
+
 apterm = do es<-many1 delterm
             return (foldl1 App es)
 
--- self-delimited expressions:
--- identifiers, constants or parentesised terms
 delterm = do x<-identifier
              return (Var x)
         <|> do n<-natural
@@ -102,7 +107,7 @@ delim_expr = do { x<-identifier; return (Var x) }
              <|> do { n<-natural; return (Lit (LitI (fromInteger n))) }
              <|> parens term
 
-defs = emptyDef { reservedNames   = ["if", "then", "else", "case", "of", "true", "false", "->", "."],
+defs = emptyDef { reservedNames   = ["if", "then", "else", "case", "of", "true", "false", "->", ".", "let", "in", "="],
                   reservedOpNames = ["\\", "+", "-", "*", "/", ">",
                                      "<", ">=", "<=", "==", "|"]
                 }
