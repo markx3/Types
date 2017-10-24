@@ -43,7 +43,7 @@ tiContext g i = do
         Just s  -> do t <- inst (getIds g) s
                       return t
 
-contextLookup []             i = Nothing
+contextLookup []            i = Nothing
 contextLookup (i' :>: t:xs) i = if i == i' then Just t else contextLookup xs i
 
 tiExpr g (Var i) = do t <- tiContext g i
@@ -55,7 +55,7 @@ tiExpr g (App e e') = do (t,  s1) <- tiExpr g e
                          return (apply s3 b, s3 @@ s2 @@ s1)
 tiExpr g (Lam i e) = do b <- freshVar
                         (t, s)  <- tiExpr (g /+/ [i:>:b]) e
-                        traceM $ show s
+                        --traceM $ show s
                         return (apply s (b --> t), s)
 tiExpr g (Lit i) = do (t, s) <- tiLit i
                       return (t, s)
@@ -72,7 +72,7 @@ tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
                             --let s''       = nub $ concatMap (unify (te --> fv)) t'
                             let s''       = unifyAll (te --> fv) t' []
                             let sr        = s'' @@ s' @@ s
-                            traceM $ show sr
+                            --traceM $ show sr
                             return (apply sr fv, sr)
                             -- case checkOverlap (map fst s'') of
                             --      Just True -> return (apply s'' fv, s'' @@ s' @@ s)
@@ -81,16 +81,15 @@ tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
 tiExpr g (Let (x,e) e') = do (t, s) <- tiExpr g e
                              let g'  = apply s g
                                  t'  = quantify (getIds g') t
-                             traceM $ show t'
+                             --traceM $ show t'
                              (t'', s') <- tiExpr (g' /+/ [x:>:t']) e'
-                             t''' <- inst (getIds g') t''
-                             traceM $ show g'
+                             --traceM $ show g'
                              return (t'', s' @@ s)
 
 unifyAll t []     s = s
 unifyAll t (x:xs) s = let u = unify t x
                           s'= s @@ u
-                        in unifyAll (apply s' t) xs s'
+                      in unifyAll (apply s' t) xs s'
 
 getIds []             = []
 getIds ((i :>: t):xs) = i : getIds xs

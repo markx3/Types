@@ -47,14 +47,16 @@ cases = do mpat <- pat
            e <- term
            return (mpat, e)
 
-pat = do p <- parens pcon
+pat = do p <- pcon
          return p
+      <|> do p <- parens pcon
+             return p
       <|> do
           p <- pvar
           return p
-          <|> do
-              p <- plit
-              return p
+      <|> do
+          p <- plit
+          return p
 
 pcon = do u <- upper
           x <- many letter
