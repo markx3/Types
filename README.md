@@ -11,4 +11,4 @@ Some examples of expressions:
 | \\\\x y. case x y of (Right ans) -> false \| (Left err) -> true  | (t1->Either a b)->t1->Bool |
 | \\\\x . case x of (Just y) -> true \| (Nothing) -> true"         | Maybe a->Bool            |
 | \\\\x y . if (x + y) > 0 then true else false 		           | Int->Int->Bool             |
-| \\\\ f . let g = \\ x . f x in g                                 | t1->t32->t1->t32             |
+| \\\\ f . let g = \\\\ x . f x in g                                 | t1->t32->t1->t32             |
