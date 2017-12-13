@@ -15,6 +15,7 @@ data SimpleType   = TVar Id
                   | TApp SimpleType SimpleType
                   | TLit Lit
                   | TGen Int
+                  | DCon (Id,[SimpleType])
                   deriving Eq
 
 data Type = Forall SimpleType deriving (Eq, Show)
@@ -51,6 +52,7 @@ instance Show SimpleType where
    show (TApp t t') = show t ++ " " ++ show t'
    show (TCon u) = u
    show (TLit u) = show u
+   show (DCon a@(u, t)) = show u ++ show t
 
 --------------------------
 instance Functor TI where
@@ -70,6 +72,7 @@ freshVar = TI (\e -> let v = "t"++show e in (TVar v, e+1))
 runTI (TI m) = let (t, _) = m 0 in t
 ----------------------------
 t --> t' = TArr t t'
+t |-> t' = TApp t t'
 
 infixr 4 @@
 (@@)       :: Subst -> Subst -> Subst

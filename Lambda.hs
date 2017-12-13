@@ -4,6 +4,8 @@ import Tests
 import Text.ParserCombinators.Parsec
 import Debug.Trace
 import Data.List(nub, nubBy)
+import System.IO
+import Control.Monad
 import qualified Data.Map as Map
 
 tiLit (Int) = return (typeInt, [])
@@ -72,7 +74,7 @@ tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
                             --let s''       = nub $ concatMap (unify (te --> fv)) t'
                             let s''       = unifyAll (te --> fv) t' []
                             let sr        = s'' @@ s' @@ s
-                            --traceM $ show sr
+                            traceM $ show g
                             return (apply sr fv, sr)
                             -- case checkOverlap (map fst s'') of
                             --      Just True -> return (apply s'' fv, s'' @@ s' @@ s)
@@ -111,11 +113,7 @@ isUnique a = go Nothing a
           go s@(Just False) _ _ = s
 
 {--Fazer for all Just... --}
-context = [ "Just"    :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
-            "Nothing" :>: TApp (TCon "Maybe") (TVar "a"),
-            "Left"    :>: TArr (TVar "a") (TApp (TApp (TCon "Either") (TVar "a")) (TVar "b")),
-            "Right"   :>: TArr (TVar "b") (TApp (TApp (TCon "Either") (TVar "a")) (TVar "b")),
-            "+"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
+context = [ "+"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
             "-"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
             "*"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
             "/"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
@@ -125,9 +123,22 @@ context = [ "Just"    :>: TArr (TVar "a") (TApp (TCon "Maybe") (TVar "a")),
             "<"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool)),
             "<="      :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool))]
 
+getContext = do content          <- readFile "typeDecl.txt"
+                let declarations  = lines content
+                    assumps       = getAssumps declarations
+                    ret           = context ++ assumps
+                return $ (ret)
+                where
+                    getAssumps [] = []
+                    getAssumps (x:xs) =
+                        case parse startData "" x of
+                            Right ans -> ans ++ getAssumps xs
+                            Left  err -> error $ "Type declaration error at" ++ show x
+
 infer e = runTI (tiExpr context e)
-infer1 e = fst $ runTI (tiExpr context e)
+infer1 e g = fst $ runTI (tiExpr g e)
 hocuspocus s = do case parse start "" s of
-                      Right ans -> do traceM $ "\n" ++ show ans ++ "\n"
-                                      return (infer1 ans)
+                      Right ans -> do g <- getContext
+                                      traceM $ "\n" ++ show ans ++ "\n"
+                                      return (infer1 ans g)
                       otherwise -> error ("Parse error")

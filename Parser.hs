@@ -4,7 +4,39 @@ import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Language
 import Text.ParserCombinators.Parsec.Expr
 import Data.Char
+import Debug.Trace
 import qualified Text.ParserCombinators.Parsec.Token as Tok
+
+startData = do e <- datap
+               whiteSpace
+               eof
+               return e
+
+datap = do reserved "data"
+           tcon <- tconp
+           spaces
+           tparams <- many tvar
+           reserved "="
+           dcons <- sepBy dcon $ reservedOp "|"
+           return $ arange tcon tparams dcons
+
+arange tcon tparams [] = []
+arange tcon tparams ((u, ps):ds) =
+    (u :>: foldr (-->) (foldl (|->) tcon tparams) ps) : arange tcon tparams ds
+
+tvar = do x <- identifier
+          return $ TVar x
+
+tconp = do u <- upper
+           x <- many letter
+           return $ TCon (u:x)
+
+dcon = do u <- upper
+          x <- many letter
+          spaces
+          dparam <- sepBy tvar $ spaces
+          return $ ((u:x), dparam)
+
 
 start = do e <- term
            whiteSpace
@@ -109,7 +141,7 @@ delim_expr = do { x<-identifier; return (Var x) }
              <|> do { n<-natural; return (Lit (LitI (fromInteger n))) }
              <|> parens term
 
-defs = emptyDef { reservedNames   = ["if", "then", "else", "case", "of", "true", "false", "->", ".", "let", "in", "="],
+defs = emptyDef { reservedNames   = ["if", "then", "else", "case", "of", "true", "false", "->", ".", "let", "in", "=", "data"],
                   reservedOpNames = ["\\", "+", "-", "*", "/", ">",
                                      "<", ">=", "<=", "==", "|"]
                 }
