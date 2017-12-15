@@ -21,7 +21,7 @@ datap = do reserved "data"
            return $ arange tcon tparams dcons
 
 arange tcon tparams [] = []
-arange tcon tparams ((dcon, dpar):ds) = map
+arange tcon tparams ((dcon, dpar):ds) =
     dcon :>: foldr (-->) (foldl (|->) tcon tparams) dpar:arange tcon tparams ds
 
 tvar = do x <- identifier

@@ -74,7 +74,7 @@ tiExpr g (Case e alts) = do (te, s)      <- tiExpr g e
                             --let s''       = nub $ concatMap (unify (te --> fv)) t'
                             let s''       = unifyAll (te --> fv) t' []
                             let sr        = s'' @@ s' @@ s
-                            traceM $ show g
+                            -- traceM $ show g
                             return (apply sr fv, sr)
                             -- case checkOverlap (map fst s'') of
                             --      Just True -> return (apply s'' fv, s'' @@ s' @@ s)
@@ -112,7 +112,7 @@ isUnique a = go Nothing a
             | otherwise = go s x zs
           go s@(Just False) _ _ = s
 
-{--Fazer for all Just... --}
+{--Fazer forall Just... --}
 context = [ "+"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
             "-"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
             "*"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
@@ -123,11 +123,8 @@ context = [ "+"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
             "<"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool)),
             "<="      :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool))]
 
-getContext = do content          <- readFile "typeDecl.txt"
-                let declarations  = init $ lines $ content
-                    assumps       = getAssumps declarations
-                    ret           = context ++ assumps
-                return $ (ret)
+getContext = do content <- readFile "typeDecl.txt"
+                return $ context ++ ([content] >>= getAssumps . init . lines)
                 where
                     getAssumps [] = []
                     getAssumps (x:xs) =
@@ -139,12 +136,10 @@ infer e = runTI (tiExpr context e)
 infer1 e g = fst $ runTI (tiExpr g e)
 
 main = do content <- readFile "typeDecl.txt"
-          let expr = last $ lines $ content
-          traceM $ show expr
-          hocuspocus expr
+          hocuspocus $ [content] >>= last . lines
 
-hocuspocus s = do case parse start "" s of
-                      Right ans -> do g <- getContext
-                                      traceM $ "\n" ++ show ans ++ "\n"
-                                      return (infer1 ans g)
-                      otherwise -> error ("Parse error")
+hocuspocus s = case parse start "" s of
+                Right ans -> do g <- getContext
+                                traceM $ "\n" ++ show ans ++ "\n"
+                                return (infer1 ans g)
+                Left  err -> error ("Parse error")
