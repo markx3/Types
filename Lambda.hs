@@ -124,7 +124,7 @@ context = [ "+"       :>: TArr (TLit Int) (TArr (TLit Int) (TLit Int)),
             "<="      :>: TArr (TLit Int) (TArr (TLit Int) (TLit Bool))]
 
 getContext = do content          <- readFile "typeDecl.txt"
-                let declarations  = lines content
+                let declarations  = init $ lines $ content
                     assumps       = getAssumps declarations
                     ret           = context ++ assumps
                 return $ (ret)
@@ -137,6 +137,12 @@ getContext = do content          <- readFile "typeDecl.txt"
 
 infer e = runTI (tiExpr context e)
 infer1 e g = fst $ runTI (tiExpr g e)
+
+main = do content <- readFile "typeDecl.txt"
+          let expr = last $ lines $ content
+          traceM $ show expr
+          hocuspocus expr
+
 hocuspocus s = do case parse start "" s of
                       Right ans -> do g <- getContext
                                       traceM $ "\n" ++ show ans ++ "\n"

@@ -1,2 +1,3 @@
-data Either a b = Left a | Right b
-data Maybe  a   = Just a | Nothing
+data Either a b =  Left a | Right b
+data Maybe  a   =  Just a | Nothing
+\f . let g = \a . case a of Just 1 -> true | Nothing -> false in g f

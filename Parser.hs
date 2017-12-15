@@ -21,8 +21,8 @@ datap = do reserved "data"
            return $ arange tcon tparams dcons
 
 arange tcon tparams [] = []
-arange tcon tparams ((u, ps):ds) =
-    (u :>: foldr (-->) (foldl (|->) tcon tparams) ps) : arange tcon tparams ds
+arange tcon tparams ((dcon, dpar):ds) = map
+    dcon :>: foldr (-->) (foldl (|->) tcon tparams) dpar:arange tcon tparams ds
 
 tvar = do x <- identifier
           return $ TVar x
@@ -152,4 +152,5 @@ reservedOp = Tok.reservedOp lexer
 identifier = Tok.identifier lexer
 natural    = Tok.natural    lexer
 parens     = Tok.parens     lexer
+brackets   = Tok.brackets   lexer
 whiteSpace = Tok.whiteSpace lexer
